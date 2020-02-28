@@ -67,12 +67,12 @@ Status Dropout<T1, T2, trainable_dropout>::ComputeInternal(OpKernelContext* cont
   if ((0 == ratio_data /*Backward compat with TrainableDropout*/) ||
       (!trainable_dropout && (training_mode == nullptr || *(training_mode->Data<bool>()) == false))) {
     if (Y_data != X_data) {
-      CUDA_CALL_THROW(cudaMemcpyAsync(Y_data, X_data, N * sizeof(T1), cudaMemcpyDeviceToDevice));
+      CUDA_CALL_THROW(cudaMemcpyAsync(Y_data, X_data, N * sizeof(T1), cudaMemcpyDeviceToDevice, Stream()));
     }
 
     // If mask is requested, return all 1s.
     if (mask != nullptr) {
-      ORT_ENFORCE(cudaMemset(mask->MutableData<bool>(), true, N * sizeof(bool)) == cudaSuccess);
+      ORT_ENFORCE(cudaMemsetAsync(mask->MutableData<bool>(), true, N * sizeof(bool), Stream()) == cudaSuccess);
     }
 
     return Status::OK();
@@ -86,7 +86,7 @@ Status Dropout<T1, T2, trainable_dropout>::ComputeInternal(OpKernelContext* cont
   }();
 
   PhiloxGenerator& generator = generator_ != nullptr ? *generator_.get() : PhiloxGenerator::Default();
-  DropoutKernelImpl(GetDeviceProp(), N, ratio_data, generator, X_data, Y_data, mask_data);
+  DropoutKernelImpl(Stream(), GetDeviceProp(), N, ratio_data, generator, X_data, Y_data, mask_data);
 
   return Status::OK();
 }

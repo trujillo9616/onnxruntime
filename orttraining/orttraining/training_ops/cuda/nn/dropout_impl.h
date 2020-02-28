@@ -10,6 +10,7 @@ namespace cuda {
 
 template <typename T>
 void DropoutGradientKernelImpl(
+  cudaStream_t stream,
   const int64_t N,
   const T* dY_data,
   const bool* mask_data,

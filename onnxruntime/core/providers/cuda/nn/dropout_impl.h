@@ -10,6 +10,7 @@ namespace cuda {
 
 template <typename T>
 void DropoutKernelImpl(
+  cudaStream_t stream,
   const cudaDeviceProp& prop,
   const int64_t N,
   const float ratio,

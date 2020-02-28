@@ -37,6 +37,7 @@ __global__ void DropoutGradientKernel(
 
 template <typename T>
 void DropoutGradientKernelImpl(
+    cudaStream_t stream,
     const int64_t N,
     const T* dY_data,
     const bool* mask_data,
@@ -44,17 +45,18 @@ void DropoutGradientKernelImpl(
     T* dX_data) {
   if (ratio == 0.0f) {
     if (dY_data != dX_data) {
-      CUDA_CALL_THROW(cudaMemcpyAsync(dX_data, dY_data, N * sizeof(T), cudaMemcpyDeviceToDevice));
+      CUDA_CALL_THROW(cudaMemcpyAsync(dX_data, dY_data, N * sizeof(T), cudaMemcpyDeviceToDevice, stream));
     }
   } else {
     const float scale = 1.f / (1.f - ratio);
     const int blocksPerGrid = (N + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    DropoutGradientKernel<T><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0>>>(N, dY_data, mask_data, T(scale), dX_data);
+    DropoutGradientKernel<T><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, stream>>>(N, dY_data, mask_data, T(scale), dX_data);
   }
 }
 
 #define SPECIALIZED_DROPOUT_GRAD_IMPL(T)   \
   template void DropoutGradientKernelImpl( \
+      cudaStream_t stream,           \
       const int64_t N,                     \
       const T* dY_data,                    \
       const bool* mask_data,               \
