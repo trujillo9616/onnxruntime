@@ -9,17 +9,7 @@
 #include <random>
 
 using namespace onnxruntime;
-
-static float* GenerateFloatArray(size_t batch_size, float low, float high) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> dist(low, high);
-  float* data = (float*)_aligned_malloc(sizeof(float) * batch_size, 64);
-  for (size_t i = 0; i != batch_size; ++i) {
-    data[i] = dist(gen);
-  }
-  return data;
-}
+extern float* GenerateFloatArray(size_t batch_size, float low, float high);
 
 //naive implementation of Gelu
 static void BM_GeluSingleThreadPlainLoop(benchmark::State& state) {

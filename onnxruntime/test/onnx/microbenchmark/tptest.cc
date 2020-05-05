@@ -10,6 +10,7 @@
 using namespace onnxruntime;
 using namespace onnxruntime::concurrency;
 
+
 static void BM_CreateThreadPool(benchmark::State& state) {
   for (auto _ : state) {
     ThreadPool tp(&onnxruntime::Env::Default(), onnxruntime::ThreadOptions(), ORT_TSTR(""), 48, true);
