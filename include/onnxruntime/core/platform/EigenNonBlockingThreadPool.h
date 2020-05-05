@@ -32,6 +32,7 @@
 #endif
 #include "core/platform/ort_mutex.h"
 #include "core/platform/Barrier.h"
+#include "core/platform/thread_pool_interface.h"
 
 namespace onnxruntime {
 
