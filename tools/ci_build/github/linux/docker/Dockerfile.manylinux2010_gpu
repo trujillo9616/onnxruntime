@@ -1,14 +1,16 @@
 FROM quay.io/pypa/manylinux2010_x86_64:2020-04-04-f427f46
 
+#manylinux2010 is based on CentOS6
+#The default GCC version is 8.3.1
+
+#The image has python 3.5/3.6/3.7/3.8 under /opt/python
 ARG PYTHON_VERSION=3.5
 
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 
 ADD scripts /tmp/scripts
-RUN cd /tmp/scripts && /tmp/scripts/install_centos.sh && /tmp/scripts/install_deps.sh -p $PYTHON_VERSION && \
-yum remove -y devtoolset-\*  && yum install -y devtoolset-7-binutils devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-gcc-gfortran devtoolset-7-libquadmath-devel devtoolset-7-libstdc++-devel devtoolset-7-runtime && \
-rm -rf /tmp/scripts
+RUN cd /tmp/scripts && /tmp/scripts/install_centos.sh && /tmp/scripts/install_deps.sh -p $PYTHON_VERSION && rm -rf /tmp/scripts
 
 #Below are copied from https://gitlab.com/nvidia/container-images/cuda/tree/master/dist/centos6
 
@@ -40,7 +42,7 @@ libcublas-devel-10.2.1.243-1 \
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/opt/rh/devtoolset-7/root/usr/bin:${PATH}
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
 # nvidia-container-runtime
