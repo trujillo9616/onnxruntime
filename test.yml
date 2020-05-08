@@ -10,6 +10,7 @@ steps:
       inputs:
         script: |
           df
+          df /var/lib/docker
           docker info
           docker image ls
           docker container ls
