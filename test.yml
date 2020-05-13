@@ -18,5 +18,4 @@ steps:
     - task: CmdLine@2
       inputs:
         script: |
-          docker build --pull -t onnxruntime-ubuntu16.04-cuda10.1-cudnn7.6 --build-arg BUILD_USER=onnxruntimedev --build-arg BUILD_UID=$(id -u) --build-arg PYTHON_VERSION=3.6 --build-arg 'BUILD_EXTR_PAR= --enable_training --config Debug --skip_onnx_tests --build_wheel ' -f Dockerfile.ubuntu_gpu .
-        workingDirectory: '$(Build.SourcesDirectory)/tools/ci_build/github/linux/docker'
+          echo hello
