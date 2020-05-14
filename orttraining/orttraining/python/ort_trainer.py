@@ -9,6 +9,7 @@ import torch
 import torch.nn
 import torch.onnx
 import onnxruntime as ort
+import onnxruntime.capi.postprocess as postprocess
 from distutils.version import LooseVersion
 from .checkpointing_utils import list_checkpoint_files, get_checkpoint_name, CombineZeroCheckpoint
 import onnxruntime.capi.pt_patch
@@ -202,7 +203,7 @@ def wrap_for_input_match(model, input_names):
     model = WrapModel(model, input_names)
     return model
 
-def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, opset_version=DEFAULT_OPSET_VERSION):
+def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, opset_version=DEFAULT_OPSET_VERSION, _enable_internal_postprocess=True):
     # example: {input0:{0:'batch'}, input1:{0:'batch'}}
     dynamic_axes = {}
     for input in model_desc.inputs_:
@@ -282,13 +283,9 @@ def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, op
         for i, name in enumerate(n.input):
             if name in replace_name_dict:
                 n.input[i] = replace_name_dict[name]
-    import onnxruntime.capi.postprocess as postprocess
-    # TODO : WE CAN REMOVE SCE PASS FOR OPSET >= 12 with pytorch master (post 1.5)
-    model = postprocess.fuse_sofmaxNLL_to_softmaxCE(model)
 
-    model = postprocess.fix_transpose(model)
-    model = postprocess.layer_norm_transform(model)
-    model = postprocess.fix_expand_shape(model)
+    if _enable_internal_postprocess:
+        onnx_model = postprocess.run_postprocess(onnx_model)
 
     # onnx model initializer may contain non-trainable registered buffers that are not part
     # of pytorch model named parameteres.
@@ -455,10 +452,10 @@ def load_checkpoint(model, checkpoint_dir, checkpoint_prefix="ORT_checkpoint", s
 class ORTTrainer():
 
     def __init__(self, model, loss_fn, model_desc, training_optimizer_name, map_optimizer_attributes,
-                 learning_rate_description, device, gradient_accumulation_steps=1, postprocess_model=None,
+                 learning_rate_description, device, gradient_accumulation_steps=1,
                  world_rank=0, world_size=1, use_mixed_precision=False, allreduce_post_accumulation=False,
                  global_step=0, get_lr_this_step=None, loss_scaler=None, partition_optimizer=False,
-                 enable_grad_norm_clip=True, frozen_weights=[], _opset_version=DEFAULT_OPSET_VERSION):
+                 enable_grad_norm_clip=True, frozen_weights=[], _opset_version=DEFAULT_OPSET_VERSION, _enable_internal_postprocess=True, _extra_postprocess=None):
         super(ORTTrainer, self).__init__()
         """
         Initializes ORTTrainer.
@@ -488,6 +485,7 @@ class ORTTrainer():
             use_mixed_precision: flag to enable mixed precision (aka fp16) (default is False)
             allreduce_post_accumulation: controls whether overlaping gradient computation with allreduce (default is False)
             partition_optimizer: controls whether to partition the optimizer state (default is False)
+            _enable_internal_postprocess: whether to run or not the internal postprocesses (default is True)
         """
         self.is_train = True
 
@@ -522,7 +520,7 @@ class ORTTrainer():
         # we use self.global_step_ to count optimizations being performed.
         # it is used to calculate learning rate if self.get_lr_this_step_ is provided.
         self.global_step_ = global_step
-        self.post_process_model_fn_ = postprocess_model
+        self.post_process_model_fn_ = _extra_postprocess
         self.get_lr_this_step_ = get_lr_this_step
         self.loss_scaler_ = loss_scaler
 
@@ -537,6 +535,7 @@ class ORTTrainer():
         self.frozen_weights_ = frozen_weights
         self.opset_version_ = _opset_version
         self.state_dict_ = None
+        self._enable_internal_postprocess = _enable_internal_postprocess
 
         # use this special string to workaround a corner case that external loss_scale is passed into train_step as kwargs.
         # see prepare_input_and_fetches for more details.
@@ -547,6 +546,9 @@ class ORTTrainer():
     def _init_session(self):
         if self.onnx_model_ is None:
             return
+
+        if self._enable_internal_postprocess:
+            self._onnx_model_ = postprocess.run_postprocess(self.onnx_model_)
 
         self._verify_fully_optimized_model(self.onnx_model_)
         self.session, self.train_io_binding, self.eval_io_binding, self.output_name, _, self.output_types = \
@@ -594,13 +596,15 @@ class ORTTrainer():
 
     def _init_onnx_model(self, inputs):
         if self.onnx_model_ is not None:
+            if self._enable_internal_postprocess:
+                self.onnx_model_ = postprocess.run_postprocess(self.onnx_model_)
             return
 
         if self.torch_model_ is not None:
             # NOTE: pt model is moved to cpu to conserve gpu memory.
             self.torch_model_.cpu()
             self.onnx_model_ = convert_model_loss_fn_to_onnx(
-                self.torch_model_, self.loss_fn_, self.model_desc_, torch.device('cpu'), inputs, opset_version=self.opset_version_)
+                self.torch_model_, self.loss_fn_, self.model_desc_, torch.device('cpu'), inputs, opset_version=self.opset_version_, _enable_internal_postprocess=self._enable_internal_postprocess)
 
             if self.post_process_model_fn_:
                 self.post_process_model_fn_(self.onnx_model_)
