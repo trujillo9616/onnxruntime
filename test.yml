@@ -18,4 +18,5 @@ steps:
     - task: CmdLine@2
       inputs:
         script: |
-          echo hello
+          docker image prune
+          docker image rm $(docker image ls --format='{{.ID}}' onnxruntime-training-manylinux*)
