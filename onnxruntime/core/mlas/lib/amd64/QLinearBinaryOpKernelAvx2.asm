@@ -166,6 +166,8 @@ ENDIF
 
         vpsubd  ymm6,ymm6,ymm5
         vpsubd  ymm7,ymm7,ymm5
+        vcvtdq2ps ymm6,ymm6                     # Float Max Value Vector
+        vcvtdq2ps ymm7,ymm7                     # Float Min Value Vector
 
         mov     r8,QLinearBinaryOpFrame.OutputC[rsp]
         mov     rdx,QLinearBinaryOpFrame.LengthA[rsp]
@@ -199,9 +201,9 @@ QLinear&OpName&&DataType&Avx2Process8LoopScalarOnVector:
         vdivps  ymm9,ymm9,ymm2                  ; Quantize 8 values, / ScaleC
         add     r9,8                            ; out-of-order instruction(s)
         sub     rdx,8                           ; out-of-order instruction(s), set flag for jb below
+        vminps  ymm9,ymm9,ymm6
+        vmaxps  ymm9,ymm9,ymm7
         vcvtps2dq ymm9,ymm9                     ; nearbyintf()
-        vpmaxsd ymm9,ymm9,ymm7
-        vpminsd ymm9,ymm9,ymm6
         vpaddd  ymm9,ymm9,ymm5                  ; + ZeroPointC
         vpshufb ymm9,ymm9,ymm10                 ; pack 32bits integers into 8bit integers
         vpermps ymm9,ymm11,ymm9
@@ -241,9 +243,9 @@ QLinear&OpName&&DataType&Avx2Process8LoopVectorOnScalar:
         vdivps  ymm8,ymm8,ymm2                  ; Quantize 8 values, / ScaleC
         add     rcx,8                           ; out-of-order instruction(s)
         sub     rdx,8                           ; out-of-order instruction(s)
+        vminps  ymm8,ymm8,ymm6
+        vmaxps  ymm8,ymm8,ymm7
         vcvtps2dq ymm8,ymm8                     ; nearbyintf()()
-        vpmaxsd ymm8,ymm8,ymm7
-        vpminsd ymm8,ymm8,ymm6
         vpaddd  ymm8,ymm8,ymm5                  ; + ZeroPointC
         vpshufb ymm8,ymm8,ymm10                 ; pack 32bits integers into 8bit integers
         vpermps ymm8,ymm11,ymm8
@@ -280,9 +282,9 @@ QLinear&OpName&&DataType&Avx2Process8LoopVectorOnVector:
         add     rcx,8                           ; out-of-order instruction(s)
         add     r9,8                            ; out-of-order instruction(s)
         sub     rdx,8                           ; out-of-order instruction(s), set flag for jb below
+        vminps  ymm8,ymm8,ymm6
+        vmaxps  ymm8,ymm8,ymm7
         vcvtps2dq ymm8,ymm8                     ; nearbyintf()
-        vpmaxsd ymm8,ymm8,ymm7
-        vpminsd ymm8,ymm8,ymm6
         vpaddd  ymm8,ymm8,ymm5                  ; + ZeroPointC
         vpshufb ymm8,ymm8,ymm10                 ; pack 32bits integers into 8bit integers
         vpermps ymm8,ymm11,ymm8
