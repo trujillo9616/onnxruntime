@@ -132,7 +132,7 @@ C_UNDERSCORE(MlasQLinear\OpName\()\DataType\()KernelAvx2):
         vpbroadcastd ymm6,xmm6                  # Max U8/S8 Int Value Vector
 
 .ifeq .MinValue_\DataType
-        vpxord  ymm7,ymm7,ymm7                  # Min U8 Int Value Vector
+        vxorps  ymm7,ymm7,ymm7                  # Min U8 Int Value Vector
 .else
         mov     esi,.MinValue_\DataType
         vmovd   xmm7,esi

@@ -152,22 +152,22 @@ QLinearBinaryOpAvx2 MACRO DataType, OpName, OpInstruction
         vmovaps ymm10,YMMWORD PTR [MlasPackBytesMM256VpshufbControl]
         vmovaps ymm11,YMMWORD PTR [MlasPackBytesMM256VpermpsControl]
 
-        mov     edx,MaxValue_&DataType&
-        vmovd   xmm6,edx
+        mov     eax,MaxValue_&DataType&
+        vmovd   xmm6,eax
         vpbroadcastd ymm6,xmm6                  ; Max U8/S8 Value Vector
 
 IFE MinValue_&DataType&
-        vpxord ymm7,ymm7,ymm7                   ; Min U8 Value Vector
+        vxorps  ymm7,ymm7,ymm7                  ; Min U8 Value Vector
 ELSE
-        mov     r8d,MinValue_&DataType&
-        vmovd   xmm7,r8d
+        mov     eax,MinValue_&DataType&
+        vmovd   xmm7,eax
         vpbroadcastd ymm7,xmm7                  ; Min S8 Value Vector
 ENDIF
 
         vpsubd  ymm6,ymm6,ymm5
         vpsubd  ymm7,ymm7,ymm5
-        vcvtdq2ps ymm6,ymm6                     # Float Max Value Vector
-        vcvtdq2ps ymm7,ymm7                     # Float Min Value Vector
+        vcvtdq2ps ymm6,ymm6                     ; Float Max Value Vector
+        vcvtdq2ps ymm7,ymm7                     ; Float Min Value Vector
 
         mov     r8,QLinearBinaryOpFrame.OutputC[rsp]
         mov     rdx,QLinearBinaryOpFrame.LengthA[rsp]
@@ -191,7 +191,7 @@ QLinear&OpName&&DataType&Avx2Process8EntranceScalarOnVector:
         vmulps  ymm8,ymm8,ymm0                  ; * ScaleA
 
 QLinear&OpName&&DataType&Avx2Process8LoopScalarOnVector:
-        UnpackBytesDWords_&DataType& ymm9,[r9]  ; IntegerVectorB
+        UnpackBytesDWords_&DataType& ymm9,QWORD PTR [r9]  ; IntegerVectorB
         vpsubd  ymm9,ymm9,ymm4                  ; - ZeroPointB
         vcvtdq2ps ymm9,ymm9                     ; FloatVectorB
         vmulps  ymm9,ymm9,ymm1                  ; * ScaleB
@@ -233,7 +233,7 @@ QLinear&OpName&&DataType&Avx2Process8EntranceVectorOnScalar:
         vmulps  ymm9,ymm9,ymm1                  ; * ScaleB
 
 QLinear&OpName&&DataType&Avx2Process8LoopVectorOnScalar:
-        UnpackBytesDWords_&DataType& ymm8,[rcx] ; IntegerVectorA
+        UnpackBytesDWords_&DataType& ymm8,QWORD PTR [rcx] ; IntegerVectorA
         vpsubd  ymm8,ymm8,ymm3                  ; - ZeroPointA
         vcvtdq2ps ymm8,ymm8                     ; FloatVectorA
         vmulps  ymm8,ymm8,ymm0                  ; * ScaleA
@@ -267,8 +267,8 @@ QLinear&OpName&&DataType&Avx2Process8LoopVectorOnVector:
         test    rdx,rdx
         jz      QLinear&OpName&&DataType&Avx2Exit
 
-        UnpackBytesDWords_&DataType& ymm8,[rcx] ; IntegerVectorA
-        UnpackBytesDWords_&DataType& ymm9,[r9]  ; IntegerVectorB
+        UnpackBytesDWords_&DataType& ymm8,QWORD PTR [rcx] ; IntegerVectorA
+        UnpackBytesDWords_&DataType& ymm9,QWORD PTR [r9]  ; IntegerVectorB
         vpsubd  ymm8,ymm8,ymm3                  ; - ZeroPointA
         vpsubd  ymm9,ymm9,ymm4                  ; - ZeroPointB
         vcvtdq2ps ymm8,ymm8                     ; FloatVectorA
