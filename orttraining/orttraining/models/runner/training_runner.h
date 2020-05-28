@@ -152,7 +152,8 @@ class TrainingRunner {
     int data_parallel_size = 1;
     int horizontal_parallel_size = 1;
     // Enable gradient clipping.
-    bool enable_grad_norm_clip=true;
+    bool enable_grad_norm_clip = true;
+    bool optimize_gathernd = false;
   };
 
   TrainingRunner(Parameters params, const Environment& env);

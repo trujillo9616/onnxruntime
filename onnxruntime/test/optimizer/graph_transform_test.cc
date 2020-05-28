@@ -42,6 +42,7 @@
 #include "core/optimizer/fast_gelu_fusion.h"
 #include "core/optimizer/expand_elimination.h"
 #include "core/optimizer/cast_elimination.h"
+#include "core/optimizer/bert_vocab_transformer.h"
 #include "core/optimizer/utils.h"
 #include "core/platform/env.h"
 #include "core/util/math.h"
@@ -104,7 +105,7 @@ TEST_F(GraphTransformationTests, DropoutElimination) {
 }
 
 TEST_F(GraphTransformationTests, SliceElimination) {
-  std::vector<std::basic_string<ORTCHAR_T> > model_names = {ORT_TSTR("slice-v1-elim.onnx"), ORT_TSTR("slice-v11-elim.onnx")};
+  std::vector<std::basic_string<ORTCHAR_T>> model_names = {ORT_TSTR("slice-v1-elim.onnx"), ORT_TSTR("slice-v11-elim.onnx")};
   for (const auto& model_name : model_names) {
     auto model_uri = MODEL_FOLDER + model_name;
     std::shared_ptr<Model> model;
@@ -349,9 +350,9 @@ TEST_F(GraphTransformationTests, DontFuseConvWithBNWithOptionalOutputs) {
 }
 
 TEST_F(GraphTransformationTests, FuseConvBNMulAddUnsqueeze) {
-  std::vector<std::basic_string<ORTCHAR_T> > test_models = {ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze.onnx"),
-                                                            ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze.negative_axes.onnx"),
-                                                            ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze-no-bias.onnx")};
+  std::vector<std::basic_string<ORTCHAR_T>> test_models = {ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze.onnx"),
+                                                           ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze.negative_axes.onnx"),
+                                                           ORT_TSTR("fusion/fuse-conv-bn-mul-add-unsqueeze-no-bias.onnx")};
   for (const auto& model : test_models) {
     auto model_uri = MODEL_FOLDER + model;
 
@@ -1116,7 +1117,6 @@ TEST_F(GraphTransformationTests, ReshapeFusionInternalReuseTest) {
   }
 }
 
-
 TEST_F(GraphTransformationTests, ReshapeFusionGraphInputsTest) {
   auto model_uri = MODEL_FOLDER "fusion/reshape_fusion_with_graph_inputs.onnx";
   std::shared_ptr<Model> p_model;
@@ -1135,7 +1135,6 @@ TEST_F(GraphTransformationTests, ReshapeFusionGraphInputsTest) {
   ASSERT_EQ(op_to_count["Concat"], 1);
   ASSERT_EQ(op_to_count["Reshape"], 1);
 }
-
 
 TEST_F(GraphTransformationTests, ExpandElimination) {
   auto model_uri = MODEL_FOLDER "expand_elimination.onnx";
@@ -1771,9 +1770,9 @@ TEST_F(GraphTransformationTests, SkipLayerNormFusion_Input_Output_Check) {
       std::vector<NodeArg*>& output_defs = node.MutableOutputDefs();
 #ifdef ENABLE_TRAINING
       EXPECT_EQ(node.OutputDefs().size(), 3u) << "SkipLayerNormalization number of outputs does not equal to 3. Got:" << node.OutputDefs().size();
-#else     
+#else
       EXPECT_EQ(node.OutputDefs().size(), 1u) << "SkipLayerNormalization number of outputs does not equal to 1. Got:" << node.OutputDefs().size();
-#endif     
+#endif
       EXPECT_EQ(output_defs[0]->Name(), "19");
     } else {
       EXPECT_EQ(node.OpType(), "MatMul") << "Unexpected node: " << node.OpType() << "," << node.Name();
@@ -1925,6 +1924,119 @@ TEST_F(GraphTransformationTests, EmbedLayerNormFusionFormat5) {
 }
 
 #endif
+
+TEST_F(GraphTransformationTests, BERT_VOCAB_TRANSFORMER) {
+  auto model_uri = MODEL_FOLDER "bert_tiny_with_cost.onnx";
+  std::shared_ptr<Model> model;
+  ASSERT_STATUS_OK(Model::Load(model_uri, model, nullptr, *logger_));
+  Graph& graph = model->MainGraph();
+  std::map<std::string, int> op_to_count = CountOpsInGraph(graph);
+  //ASSERT_TRUE(op_to_count["Unsqueeze"] == 2);
+
+  onnxruntime::GraphTransformerManager graph_transformation_mgr{5};
+  graph_transformation_mgr.Register(onnxruntime::make_unique<BertVocabTransformer>(), TransformerLevel::Level1);
+  ASSERT_STATUS_OK(graph_transformation_mgr.ApplyTransformers(graph, TransformerLevel::Level1, *logger_));
+
+  auto model_uri2 = "pengwa_test.onnx";
+  Model::Save(*model, model_uri2);
+
+  // std::default_random_engine generator{gsl::narrow_cast<uint32_t>(seed)};
+  // std::normal_distribution<int64_t> distribution{mean, scale};
+
+  // float scale = 1.f;
+  // float mean = 0.f;
+  // float seed = 123.f;
+  // std::default_random_engine generator_float{gsl::narrow_cast<uint32_t>(seed)};
+  // std::normal_distribution<float> distribution_float{mean, scale};
+
+  // int batch_size = 8;
+  // int sequence = 128;
+  // std::vector<int64_t> dims_input = {batch_size, sequence};
+  // std::vector<int64_t> values_input1(TensorShape(dims_input).Size());
+  // std::for_each(values_input1.begin(), values_input1.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+  // std::vector<int64_t> values_input2(TensorShape(dims_input).Size());
+  // std::for_each(values_input2.begin(), values_input2.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+  // std::vector<int64_t> values_input3(TensorShape(dims_input).Size());
+  // std::for_each(values_input3.begin(), values_input3.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+
+  // dynamic_predict_count = 20;
+  // std::vector<int64_t> dims_masked_input = {batch_size, dynamic_predict_count};
+  // std::vector<int64_t> values_masked_lm_positions(TensorShape(dims_masked_input).Size());
+  // std::for_each(values_masked_lm_positions.begin(), values_masked_lm_positions.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+
+  // std::vector<int64_t> values_masked_lm_ids(TensorShape(dims_masked_input).Size());
+  // std::for_each(values_masked_lm_ids.begin(), values_masked_lm_ids.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+
+  // std::vector<float> values_masked_lm_weights(TensorShape(dims_masked_input).Size());
+  // std::for_each(values_masked_lm_weights.begin(), values_masked_lm_weights.end(),
+  //               [&generator_float, &distribution_float](float& value) { value = distribution_float(generator_float); });
+
+  // std::vector<int64_t> dims_next_sentence_labels = {batch_size};
+  // std::vector<int64_t> values_next_sentence_labels(TensorShape(dims_next_sentence_labels).Size());
+  // std::for_each(values_next_sentence_labels.begin(), values_next_sentence_labels.end(),
+  //               [&generator, &distribution](int64_t& value) { value = distribution(generator); });
+
+  // std::vector<int64_t> dims_loss_scale = {1};
+  // std::vector<float> loss_scale{1024};
+  // std::vector<OrtValue> expected_ort_values;
+  // {
+  //   SessionOptions so;
+  //   so.session_logid = "RawGraphRun";
+
+  //   InferenceSession session_object{so, GetEnvironment()};
+  //   std::unique_ptr<IExecutionProvider> execution_provider = DefaultCudaExecutionProvider();
+  //   EXPECT_TRUE(session_object.RegisterExecutionProvider(std::move(execution_provider)).IsOK());
+
+  //   Status st;
+  //   ASSERT_TRUE((st = session_object.Load(model_uri)).IsOK()) << st;
+  //   ASSERT_TRUE((st = session_object.Initialize()).IsOK()) << st;
+
+  //   OrtValue input1;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_input, values_input1, &input1);
+  //   OrtValue input2;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_input, values_input2, &input2);
+  //   OrtValue input3;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_input, values_input3, &input3);
+  //   OrtValue input4;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_masked_input, values_masked_lm_positions, &input4);
+  //   OrtValue input5;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_masked_input, values_masked_lm_ids, &input5);
+  //   OrtValue input6;
+  //   CreateMLValue<float>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_masked_input, values_masked_lm_weights, &input6);
+  //   OrtValue input7;
+  //   CreateMLValue<int64_t>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_next_sentence_labels, values_next_sentence_labels, &input7);
+  //   OrtValue input8;
+  //   CreateMLValue<float>(TestCPUExecutionProvider()->GetAllocator(0, OrtMemTypeDefault), dims_loss_scale, loss_scale, &input8);
+
+  //   NameMLValMap feeds;
+  //   feeds.insert(std::make_pair("input1", input1));
+  //   feeds.insert(std::make_pair("input2", input2));
+  //   feeds.insert(std::make_pair("input3", input3));
+  //   feeds.insert(std::make_pair("masked_lm_positions", input4));
+  //   feeds.insert(std::make_pair("masked_lm_ids", input5));
+  //   feeds.insert(std::make_pair("masked_lm_weights", input6));
+  //   feeds.insert(std::make_pair("next_sentence_labels", input7));
+  //   feeds.insert(std::make_pair("input", input8));
+  //   feeds.insert(std::make_pair("loss_scale", input9));
+
+  //   // prepare outputs
+  //   std::vector<std::string> output_names;
+  //   output_names.push_back("mlm_loss");
+  //   output_names.push_back("nsp_loss");
+  //   output_names.push_back("total_loss");
+
+  //   // Now run
+  //   RunOptions run_options;
+  //   st = session_object.Run(run_options, feeds, output_names, &expected_ort_values);
+
+  //   EXPECT_TRUE(st.IsOK());
+  // }
+}
 
 }  // namespace test
 }  // namespace onnxruntime
