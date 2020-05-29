@@ -180,15 +180,18 @@ TEST(BFCArenaTest, TestCustomMemoryLimit) {
   }
 
   {
-    const size_t available = std::numeric_limits<size_t>::max() >> 2;
-    BFCArena b(std::unique_ptr<IDeviceAllocator>(new CPUAllocator()), available);
+    // allow for the maximum amount of memory less 10MiB (arbitrary value)
+    constexpr size_t available = std::numeric_limits<size_t>::max() - (5 * 1024 * 1024);
+    BFCArena b(std::unique_ptr<IDeviceAllocator>(new CPUAllocator()), available,
+               ArenaExtendStrategy::kSameAsRequested);  // need this strategy. kNextPowerOfTwo would overflow size_t
+
     void* first_ptr = b.Alloc(sizeof(float) * (1 << 6));
     EXPECT_NE(nullptr, first_ptr);
 
     // test allocation that is less than available memory, but more than what could reasonably be expected to exist.
     // first alloc creates a 1MB block so allow for that not being available.
     try {
-      b.Alloc(available - (2 * 1024 * 1024));
+      b.Alloc(available - (3 * 1024 * 1024));
       FAIL() << "Allocation should have thrown";
     } catch (const OnnxRuntimeException& ex) {
       EXPECT_THAT(ex.what(), testing::HasSubstr("Failed to allocate memory for requested buffer of size"));
